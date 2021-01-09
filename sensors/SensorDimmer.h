@@ -37,15 +37,16 @@ protected:
 	int _status = OFF;
 	int _easing = EASE_LINEAR;
 	int _duration = 1000;
-	int _step_duration = 100;
+	int _step_duration = 25;
 	int _reverse = false;
 	
 public:
 	SensorDimmer(int8_t pin, uint8_t child_id = 0): Sensor(pin) {
 		_name = "DIMMER";
 		children.allocateBlocks(2);
-		new Child(this,INT,nodeManager.getAvailableChildId(child_id),S_DIMMER,V_STATUS,_name);
-		new Child(this,INT,nodeManager.getAvailableChildId(child_id),S_DIMMER,V_PERCENTAGE,_name);
+		uint8_t id = nodeManager.getAvailableChildId(child_id);
+		new Child(this,INT,id,S_DIMMER,V_STATUS, _name);
+		new Child(this,INT,id,S_DIMMER,V_PERCENTAGE, _name);
 	};
 
 	// [101] set the effect to use for a smooth transition, can be one of SensorDimmer::EASE_LINEAR, SensorDimmer::EASE_INSINE, SensorDimmer::EASE_OUTSINE, SensorDimmer::EASE_INOUTSINE (default: EASE_LINEAR)
@@ -65,10 +66,15 @@ public:
 		_reverse = value;
 	};
 
+	// Get the light status
+	int getStatus() {
+		return _status;
+	}
+
 	// set the status of the dimmer
 	void setStatus(int value) {
 		// get the V_STATUS child
-		Child* child = children.get(1);
+		Child* child = getChild(this, V_STATUS);
 		if (value == ON) {
 			// fade the dimmer to the percentage last set
 			_fadeTo(child,_percentage);
@@ -86,13 +92,13 @@ public:
 	// set the percentage of the dimmer
 	void setPercentage(int value) {
 		// get the V_PERCENTAGE child
-		Child* child = children.get(2);
+		Child* child = getChild(this, V_PERCENTAGE);
 		int percentage = value;
 		// normalize the provided percentage
 		if (percentage < 0) percentage = 0;
 		if (percentage > 100) percentage = 100;
 		// fade to it
-		_fadeTo(child,percentage);
+		_fadeTo(child, _status ? percentage : 0);
 		_percentage = percentage;
 		child->setValue(_percentage);
 	};
@@ -108,7 +114,7 @@ public:
 
 	// what to do as the main task when receiving a message
 	void onReceive(MyMessage* message) {
-		Child* child = getChild(message->sensor);
+		Child* child = getChild(message->sensor, message->type);
 		if (child == nullptr) return;
 		// heandle a SET command
 		if (message->getCommand() == C_SET && message->type == child->getType()) {
