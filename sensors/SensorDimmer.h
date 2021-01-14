@@ -74,7 +74,9 @@ public:
 	// set the status of the dimmer
 	void setStatus(int value) {
 		// get the V_STATUS child
-		Child* child = getChild(this, V_STATUS);
+		Child* child = children.get(1);
+		Child* per = children.get(2);
+
 		if (value == ON) {
 			// fade the dimmer to the percentage last set
 			_fadeTo(child,_percentage);
@@ -83,23 +85,22 @@ public:
 			// fade the dimmer to 0
 			_fadeTo(child,0);
 		}
-		else return;
 		// send the status back
 		_status = value;
+		per->setValue(value ? _percentage : 0);
 		child->setValue(_status);
 	};
 
 	// set the percentage of the dimmer
 	void setPercentage(int value) {
 		// get the V_PERCENTAGE child
-		Child* child = getChild(this, V_PERCENTAGE);
+		Child* child = children.get(2);
 		int percentage = value;
 		// normalize the provided percentage
 		if (percentage < 0) percentage = 0;
 		if (percentage > 100) percentage = 100;
 		// fade to it
 		_fadeTo(child, _status ? percentage : 0);
-		_percentage = percentage;
 		child->setValue(_percentage);
 	};
 
@@ -144,8 +145,39 @@ public:
 	};
 #endif
 protected:
+
+	int current_step  = 1;
+	int total_steps = 1;
+	int start_from = 0;
+	int target_percentage = 0;
+	
+	
+	//TODO: Use timer here to process this shit
+	void poll_fading() {
+			int delta = target_percentage - start_from;
+			if (current_step > total_steps)
+				return; /* We're done */
+			// calculate the smooth transition and adjust it in the 0-255 range
+			_percentage = (int) _getEasing(current_step,start_from,delta, total_steps) / 100.;
+			int value_to_write = _percentage * 255;
+			// write to the PWM output
+			if (_reverse) analogWrite(_pin,255 - value_to_write);
+			else analogWrite(_pin,value_to_write);
+			current_step++;
+	}
+
+	void _fadeTo(int target)
+	{
+		total_steps = _duration / _step_duration;
+		current_step = 1;
+		target_percentage = target;
+		start_from = _percentage;
+		if (_status == OFF) start_from = 0;
+
+	}
+
 	// fade to the provided value
-	void _fadeTo(Child* child, int target_percentage) {
+	void __fadeTo(Child* child, int target_percentage) {
 		// count how many steps we need to do
 		int steps = _duration / _step_duration;
 		int start_from = _percentage;
@@ -160,7 +192,7 @@ protected:
 			if (_reverse) analogWrite(_pin,255 - value_to_write);
 			else analogWrite(_pin,value_to_write);
 			// wait at the end of this step
-			wait(_step_duration);
+			//wait(_step_duration);
 		}
 	};
 
