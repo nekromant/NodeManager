@@ -188,6 +188,7 @@ void NodeManager::presentation() {
 		sensor->presentation();
 		sleepBetweenSend();
 	}
+
 	// wait a bit before leaving this function
 	sleepBetweenSend();
 	sleepBetweenSend();
@@ -258,6 +259,14 @@ void NodeManager::loop() {
 	// run loop for all the registered sensors
 	for (List<Sensor*>::iterator itr = sensors.begin(); itr != sensors.end(); ++itr) {
 		Sensor* sensor = *itr;
+		/* Entities won't show up for some controllers (e.g. HomeAssistant) unless we send initial states */
+		if (sensor->getFirstRun()) {
+			for (List<Child*>::iterator citr = sensor->children.begin(); citr != sensor->children.end(); ++citr) {
+				Child* child = *citr;
+				child->sendValue(true);
+				sleepBetweenSend();
+			}
+		}
 		// clear the MyMessage so will be ready to be used for the sensor
 		_message.clear();
 #if NODEMANAGER_INTERRUPTS == ON
